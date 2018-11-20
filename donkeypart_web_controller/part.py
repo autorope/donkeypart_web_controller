@@ -15,13 +15,17 @@ import random
 
 import os
 import time
+import socket
 
 import tornado
 import tornado.ioloop
 import tornado.web
 import tornado.gen
 
-from donkeycar import util
+import io
+
+from PIL import Image
+import numpy as np
 
 
 class LocalWebController(tornado.web.Application):
@@ -41,7 +45,7 @@ class LocalWebController(tornado.web.Application):
         self.throttle = 0.0
         self.mode = 'user'
         self.recording = False
-        self.ip_address = util.web.get_ip_address()
+        self.ip_address = get_ip_address()
         self.access_url = 'http://{}:{}'.format(self.ip_address, self.port)
 
         self.chaos_on = False
@@ -138,7 +142,7 @@ class VideoAPI(tornado.web.RequestHandler):
             interval = .1
             if self.served_image_timestamp + interval < time.time():
 
-                img = util.img.arr_to_binary(self.application.img_arr)
+                img = arr_to_binary(self.application.img_arr)
 
                 self.write(my_boundary)
                 self.write("Content-type: image/jpeg\r\n")
@@ -148,3 +152,43 @@ class VideoAPI(tornado.web.RequestHandler):
                 yield tornado.gen.Task(self.flush)
             else:
                 yield tornado.gen.Task(ioloop.add_timeout, ioloop.time() + interval)
+
+
+
+def arr_to_binary(arr):
+    """
+    accepts: numpy array with shape (Hight, Width, Channels)
+    returns: binary stream (used to save to database)
+    """
+    img = arr_to_img(arr)
+    return img_to_binary(img)
+
+
+def arr_to_img(arr):
+    """
+    accepts: numpy array with shape (Hight, Width, Channels)
+    returns: binary stream (used to save to database)
+    """
+    arr = np.uint8(arr)
+    img = Image.fromarray(arr)
+    return img
+
+def img_to_binary(img):
+    """
+    accepts: PIL image
+    returns: binary stream (used to save to database)
+    """
+    f = io.BytesIO()
+    img.save(f, format='jpeg')
+    return f.getvalue()
+
+
+
+def get_ip_address():
+    try:
+        ip = ([l for l in ([ip for ip in socket.gethostbyname_ex(socket.gethostname())[2] if not ip.startswith("127.")][:1],
+                               [[(s.connect(('8.8.8.8', 53)), s.getsockname()[0], s.close()) for s in
+                                 [socket.socket(socket.AF_INET, socket.SOCK_DGRAM)]][0][1]]) if l][0][0])
+        return ip
+    except OSError: #occurs when cannot connect to '8.8.8.8'
+        return "127.0.0.1" #loopback
