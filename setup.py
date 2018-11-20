@@ -12,6 +12,8 @@ setup(name='donkeypart_web_controller',
       #NOTE: The url install method works in the recent version of pip but will not work if moved to pypi.
       install_requires=[
           'tornado==4.5.3',
+          'numpy',
+          'pillow',
       ],
       extras_require={'dev': ['pytest-cov']},
       classifiers=[
